@@ -2,7 +2,7 @@
 
 Projeto em Python com Streamlit (interface) e API da IGDB (dados dos jogos), seguindo paradigma funcional estrito: sem `def`, sem `for` ou `while`, usando lambda, `map`, `filter`, `reduce` e expressões condicionais.
 
-Última atualização: 09/11/2026
+Última atualização: 10/11/2026
 
 ---
 
@@ -37,20 +37,20 @@ biblioteca-de-jogos/
 │   └── backlog.json        # dados do usuário (não versionar)
 ├── .streamlit/
 │   └── secrets.toml        # credenciais (não versionar)
-├── .gitignore              # ainda não conferido
-└── requirements.txt        # ainda não criado
+├── .gitignore              # conferido: cobre .streamlit/ e dados/backlog.json
+└── requirements.txt        # feito
 ```
 
 ---
 
 ## O que já foi feito
 
-1. **Ambiente:** pasta do projeto criada, `.streamlit/secrets.toml` com `client_id` e `client_secret` da IGDB, estrutura de pastas montada no VS Code.
+1. **Ambiente:** pasta do projeto criada, `.streamlit/secrets.toml` com `client_id` e `client_secret` da IGDB (ainda não usado no código; as credenciais não foram expostas), estrutura de pastas montada no VS Code, `.gitignore` conferido.
 2. **Constantes em `cliente.py`:** `URL_TOKEN`, `URL_JOGOS`, `CABECALHO_CLIENT_ID` e `CABECALHO_AUTORIZACAO`. Endereços confirmados na documentação.
 3. **`obter_token`:** lambda que faz POST para a Twitch com `grant_type=client_credentials` e devolve o `access_token`, ou `None` em caso de falha. **Testado:** o token foi obtido com sucesso.
 4. **`consultar_jogos`:** lambda que faz POST para a IGDB com os cabeçalhos e a consulta, e devolve a lista de jogos ou `None`. **Testado:** retornou 10 jogos com `cover.url` e `genres.name` expandidos.
-5. **`montar_consulta`:** lambda pura que devolve a string Apicalypse a partir do texto limpo. Foi separada de `consultar_jogos`. **Teste sugerido, ainda sem confirmação.**
-6. **`limpar_texto_busca`:** remove aspas duplas e espaços das extremidades; devolve `None` para texto vazio. **Testada** com três casos: texto normal, com aspas e espaços, e só espaços.
+5. **`montar_consulta`:** lambda pura que devolve a string Apicalypse a partir do texto limpo. Foi separada de `consultar_jogos`. **Testada** com `"Zelda"`: o texto aparece na consulta e ela tem três linhas.
+6. **`limpar_texto_busca`:** remove aspas duplas e espaços das extremidades; devolve `None` para texto vazio. **Testada** com três casos: texto normal, com aspas e espaços, e só espaços (agora com `assert`, em `teste.py`). Já está em `src/dominio/traducao.py`.
 7. **`traduzir_jogo`:** lambda que converte o item bruto da IGDB para o formato interno, com `https:` na capa, gêneros como texto (até 3) e fallback para imagem padrão. **Testada** com dois dicionários simulados (com e sem capa).
 8. **Fronteira de erros:** bloco `try/except requests.RequestException` no `app.py`, com `timeout=10` em `consultar_jogos`. **Ainda não testada** com a internet desligada.
 9. **`src/dominio/estatisticas.py`:** todas as funções escritas como lambdas, sem `def`, `for` ou `while`:
@@ -60,7 +60,7 @@ biblioteca-de-jogos/
    - `total_de_horas(jogos)`: `reduce` com valor inicial `0.0`. **Testada** (140.0 com dados de teste, `0.0` com lista vazia).
    - `horas_por_status(jogos, status)`: composição de `filtrar_por_status` com `total_de_horas`. **Testada** com os cinco casos de status.
    - `todos_os_generos(jogos)`: concatena as listas de gêneros com `reduce`. **Testada.**
-   - `contagem_por_genero(jogos)`: `reduce` com acumulador-dicionário imutável (`{**acc, g: acc.get(g, 0) + 1}`). **Testada** com dados reais de teste.
+   - `contagem_por_genero(jogos)`: `reduce` com acumulador-dicionário imutável (`{**acc, g: acc.get(g, 0) + 1}`). **Testada** com dados reais de teste e, com `assert`, com um jogo de `"genero": []` sozinho (`{}`) e misturado a outro (resultado igual, sem erro).
    - `resumo(jogos)`: junta total de jogos, total de horas, horas por status (via `dict(map(...))` sobre `ESTADOS_VALIDOS`) e contagem por gênero. **Testada** com dados de teste e com lista vazia.
 
 ---
@@ -70,7 +70,9 @@ biblioteca-de-jogos/
 ### Ajustes em código já escrito
 
 - [ ] **Remover `"status": "quero_jogar"` de `traduzir_jogo`.** O status passa a ser definido pela interface. Confirmar se já foi feito.
-- [ ] **Mover `traduzir_jogo` e `limpar_texto_busca`** para `src/dominio/traducao.py`, se ainda estiverem no `teste.py`.
+- [x] **Mover `limpar_texto_busca`** para `src/dominio/traducao.py` (feito).
+- [ ] **Mover `traduzir_jogo`** para `src/dominio/traducao.py`. Ainda está no `teste.py`; o import falhou por isso.
+- [ ] **Remover os `print` de teste de `traducao.py`.** Eles aparecem toda vez que o módulo é importado.
 - [ ] **Usar `montar_consulta(texto)`** dentro de `consultar_jogos`, no lugar do f-string fixo.
 - [ ] **Remover o `print` do token** do `teste.py` e não compartilhar o token de novo.
 - [ ] **Testar a fronteira de erros** desligando a internet.
@@ -78,9 +80,9 @@ biblioteca-de-jogos/
 
 ### Testes pendentes
 
-- [ ] Testar `traduzir_jogo` sobre um item real da lista da IGDB (ex.: `The Legend of Zelda`), conferindo `https:` na capa, gêneros como texto e ausência de `status`.
-- [ ] Testar `montar_consulta("Zelda")` e confirmar a estrutura de três linhas.
-- [ ] Testar `contagem_por_genero` com um jogo de `"genero": []`, sozinho e misturado aos outros (resultado deve continuar igual, sem erro).
+- [ ] Testar `traduzir_jogo` sobre um item real da lista da IGDB (ex.: `The Legend of Zelda`), conferindo `https:` na capa, gêneros como texto e ausência de `status`. Só depois de mover a função para `traducao.py`.
+- [x] Testar `montar_consulta("Zelda")` e confirmar a estrutura de três linhas.
+- [x] Testar `contagem_por_genero` com um jogo de `"genero": []`, sozinho e misturado aos outros.
 
 ### Interface (`app.py`)
 
@@ -119,12 +121,11 @@ biblioteca-de-jogos/
 
 ### Entrega do projeto
 
-- [ ] Criar `requirements.txt` com `streamlit` e `requests`.
-- [ ] Conferir se `.streamlit/secrets.toml` e `dados/backlog.json` estão no `.gitignore` antes do primeiro commit.
-- [ ] Se alguma credencial tiver sido exposta em local público ou compartilhado, gerar um novo `client_secret` no painel da Twitch.
+- [x] Preencher o `requirements.txt` (já criado) com `streamlit` e `requests`.
+- [x] Conferir se `.streamlit/secrets.toml` e `dados/backlog.json` estão no `.gitignore` antes do primeiro commit.
 
 ---
 
 ## Próximo passo sugerido
 
-Rodar o teste pendente de `contagem_por_genero` com jogo sem gêneros e, em seguida, escolher entre a **persistência** (`backlog_json.py`) e os **ajustes pequenos** em código já escrito (testes de `traduzir_jogo` e `montar_consulta`, uso de `montar_consulta` em `consultar_jogos`). Depois disso, começar o bloco 1 do `app.py`.
+Mover `traduzir_jogo` para `traducao.py` (removendo o `status` e os `print` de teste) e testá-la com um item real. Depois, usar `montar_consulta` dentro de `consultar_jogos`, escolher entre a **persistência** (`backlog_json.py`) e começar o bloco 1 do `app.py`.
