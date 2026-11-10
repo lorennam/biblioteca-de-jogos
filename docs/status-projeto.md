@@ -17,6 +17,8 @@ Projeto em Python com Streamlit (interface) e API da IGDB (dados dos jogos), seg
 - **Falhas de rede:** um único `try/except` no `app.py`, na fronteira com o mundo externo. Dentro das funções, erros HTTP viram `None`.
 - **Estados válidos:** tupla `ESTADOS_VALIDOS`, com normalização por `strip().lower()`.
 - **Capa padrão:** expressão condicional para imagem de "capa indisponível".
+- **Status inválido nas estatísticas:** `filtrar_por_status` devolve lista vazia `[]` (e não `None`), para que contagens e somas continuem funcionando.
+- **Conversão de horas:** se as horas chegarem como texto (ex.: formulário), a conversão com `float(...)` é feita na entrada, antes de gravar no backlog. O `estatisticas.py` sempre recebe número.
 
 ## Estrutura de pastas
 
@@ -28,7 +30,7 @@ biblioteca-de-jogos/
 │   │   └── cliente.py      # I/O: obter token e consultar a IGDB
 │   ├── dominio/
 │   │   ├── traducao.py     # funções puras: traduzir_jogo, limpar_texto_busca
-│   │   └── estatisticas.py # funções puras: filtros e contagens (ainda não criado)
+│   │   └── estatisticas.py # funções puras: filtros e contagens (criado e testado)
 │   └── armazenamento/
 │       └── backlog_json.py # I/O: ler e gravar o JSON (ainda não criado)
 ├── dados/
@@ -51,6 +53,15 @@ biblioteca-de-jogos/
 6. **`limpar_texto_busca`:** remove aspas duplas e espaços das extremidades; devolve `None` para texto vazio. **Testada** com três casos: texto normal, com aspas e espaços, e só espaços.
 7. **`traduzir_jogo`:** lambda que converte o item bruto da IGDB para o formato interno, com `https:` na capa, gêneros como texto (até 3) e fallback para imagem padrão. **Testada** com dois dicionários simulados (com e sem capa).
 8. **Fronteira de erros:** bloco `try/except requests.RequestException` no `app.py`, com `timeout=10` em `consultar_jogos`. **Ainda não testada** com a internet desligada.
+9. **`src/dominio/estatisticas.py`:** todas as funções escritas como lambdas, sem `def`, `for` ou `while`:
+   - `normalizar_status`: `strip().lower()`.
+   - `filtrar_por_status(jogos, status)`: normaliza, valida com `ESTADOS_VALIDOS` e filtra; status inválido devolve `[]`. **Testada** com `"jogando"`, `"finalizado"`, `"quero_jogar"`, `"  JOGANDO "` e `"abacaxi"`.
+   - `total_de_jogos(jogos)`: tamanho da lista. **Testada.**
+   - `total_de_horas(jogos)`: `reduce` com valor inicial `0.0`. **Testada** (140.0 com dados de teste, `0.0` com lista vazia).
+   - `horas_por_status(jogos, status)`: composição de `filtrar_por_status` com `total_de_horas`. **Testada** com os cinco casos de status.
+   - `todos_os_generos(jogos)`: concatena as listas de gêneros com `reduce`. **Testada.**
+   - `contagem_por_genero(jogos)`: `reduce` com acumulador-dicionário imutável (`{**acc, g: acc.get(g, 0) + 1}`). **Testada** com dados reais de teste.
+   - `resumo(jogos)`: junta total de jogos, total de horas, horas por status (via `dict(map(...))` sobre `ESTADOS_VALIDOS`) e contagem por gênero. **Testada** com dados de teste e com lista vazia.
 
 ---
 
@@ -63,11 +74,13 @@ biblioteca-de-jogos/
 - [ ] **Usar `montar_consulta(texto)`** dentro de `consultar_jogos`, no lugar do f-string fixo.
 - [ ] **Remover o `print` do token** do `teste.py` e não compartilhar o token de novo.
 - [ ] **Testar a fronteira de erros** desligando a internet.
+- [ ] **Centralizar `ESTADOS_VALIDOS`:** hoje está definida em `estatisticas.py`; decidir se fica ali ou em um módulo comum, para a interface e as regras de validação reaproveitarem a mesma tupla.
 
 ### Testes pendentes
 
 - [ ] Testar `traduzir_jogo` sobre um item real da lista da IGDB (ex.: `The Legend of Zelda`), conferindo `https:` na capa, gêneros como texto e ausência de `status`.
 - [ ] Testar `montar_consulta("Zelda")` e confirmar a estrutura de três linhas.
+- [ ] Testar `contagem_por_genero` com um jogo de `"genero": []`, sozinho e misturado aos outros (resultado deve continuar igual, sem erro).
 
 ### Interface (`app.py`)
 
@@ -79,7 +92,7 @@ biblioteca-de-jogos/
 - [ ] Bloco 6: pipeline de busca (limpeza, consulta, tradução) com a fronteira de erros.
 - [ ] Bloco 7: exibição dos resultados e botão para adicionar ao backlog, com status definido pela ação do botão.
 - [ ] Bloco 8: abas do backlog (jogando, quero jogar, finalizado).
-- [ ] Bloco 9: estatísticas.
+- [ ] Bloco 9: estatísticas (basta chamar `resumo(jogos)` e exibir os valores).
 
 ### Renovação do token
 
@@ -93,16 +106,9 @@ biblioteca-de-jogos/
 - [ ] Função que grava a lista no arquivo.
 - [ ] Decidir como tratar arquivo inexistente ou corrompido.
 
-### Domínio (`src/dominio/estatisticas.py`)
-
-- [ ] Filtrar jogos por status.
-- [ ] Contar jogos por gênero.
-- [ ] Somar horas jogadas por status.
-- [ ] Calcular total de jogos e total de horas.
-
 ### Regras de validação
 
-- [ ] Validar o status com `ESTADOS_VALIDOS` e normalização `strip().lower()`.
+- [x] Validar o status com `ESTADOS_VALIDOS` e normalização `strip().lower()` (feito em `filtrar_por_status`; falta aplicar também ao definir o status na interface, ao adicionar um jogo).
 - [ ] Atualizar horas jogadas por soma, criando um novo registro.
 
 ### Melhorias futuras
@@ -121,4 +127,4 @@ biblioteca-de-jogos/
 
 ## Próximo passo sugerido
 
-Concluir os testes pendentes de `traduzir_jogo` e `montar_consulta`, aplicar os ajustes de código e então começar o bloco 1 do `app.py`.
+Rodar o teste pendente de `contagem_por_genero` com jogo sem gêneros e, em seguida, escolher entre a **persistência** (`backlog_json.py`) e os **ajustes pequenos** em código já escrito (testes de `traduzir_jogo` e `montar_consulta`, uso de `montar_consulta` em `consultar_jogos`). Depois disso, começar o bloco 1 do `app.py`.
