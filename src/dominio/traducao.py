@@ -1,15 +1,14 @@
-# funções puras: traduzir_jogo, limpeza do texto
-
 limpar_texto_busca = lambda texto: (
     texto.strip().replace('"', '')
     if texto and texto.strip().replace('"', '')
     else None
 )
 
-entrada_normal = "The Witcher"
-entrada_com_aspas_e_espacos = '  "Zelda"  '
-entrada_so_espacos = "     "
+CAPA_PADRAO = "https://placehold.co/90x128?text=Sem+capa"
 
-print("Normal:", repr(limpar_texto_busca(entrada_normal)))
-print("Com aspas/espaços:", repr(limpar_texto_busca(entrada_com_aspas_e_espacos)))
-print("Só espaços:", repr(limpar_texto_busca(entrada_so_espacos)))
+traduzir_jogo = lambda item: {
+    "id": item["id"],
+    "nome": item["name"],
+    "capa": ("https:" + item["cover"]["url"]) if "cover" in item else CAPA_PADRAO,
+    "genero": list(map(lambda g: g["name"], item.get("genres", [])))[:3],
+}
