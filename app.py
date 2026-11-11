@@ -1,19 +1,38 @@
 import streamlit as st
 
-# 1. Configuração da página (título, layout)
-...
+st.set_page_config(
+    page_title="Biblioteca de Jogos",
+    page_icon="🎮",
+    layout="wide",
+)
 
-# 2. Carregamento das credenciais via st.secrets
-...
+credenciais_ok = "client_id" in st.secrets and "client_secret" in st.secrets
 
-# 3. Estado da sessão: token e backlog
-...
+if not credenciais_ok:
+    st.error("Credenciais da IGDB não encontradas em .streamlit/secrets.toml")
+    st.stop()
 
-# 4. Barra lateral: navegação entre as abas do backlog
-...
+client_id = st.secrets["client_id"]
+client_secret = st.secrets["client_secret"]
 
-# 5. Campo de busca: texto digitado pelo usuário
-...
+ESTADO_INICIAL = {
+    "token": None,
+    "token_expira_em": 0.0,
+    "backlog": [],
+}
+
+list(map(lambda par: st.session_state.setdefault(par[0], par[1]), ESTADO_INICIAL.items()))
+
+ABAS = ("Buscar", "Jogando", "Quero jogar", "Finalizados", "Estatísticas")
+
+st.sidebar.title("🎮 Biblioteca de Jogos")
+aba_atual = st.sidebar.radio("Navegação", ABAS)
+
+texto_busca = (
+    st.text_input("Buscar jogo", placeholder="Ex.: Zelda, Hollow Knight...")
+    if aba_atual == "Buscar"
+    else None
+)
 
 # 6. Pipeline de busca: limpeza -> consulta -> tradução
 ...
