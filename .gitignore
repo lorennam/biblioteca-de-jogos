@@ -1,4 +1,4 @@
-.streamlit/
 .streamlit/secrets.toml
-/dados
-/dados/backlog.json
+/dados/
+__pycache__/
+*.pyc
