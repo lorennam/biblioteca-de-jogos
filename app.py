@@ -4,6 +4,7 @@ import pandas as pd
 from src.igdb.cliente import obter_token, consultar_jogos
 from src.dominio.traducao import limpar_texto_busca, traduzir_jogo
 from src.dominio.estatisticas import filtrar_por_status, resumo
+from src.armazenamento.backlog_sqlite import ler_backlog, salvar_jogo, ERROS_ARMAZENAMENTO
 
 st.set_page_config(
     page_title="Biblioteca de Jogos",
@@ -24,6 +25,7 @@ ESTADO_INICIAL = {
     "token": None,
     "token_expira_em": 0.0,
     "backlog": [],
+    "backlog_carregado": False,
 }
 
 list(map(lambda par: st.session_state.setdefault(par[0], par[1]), ESTADO_INICIAL.items()))
@@ -43,6 +45,12 @@ texto_limpo = limpar_texto_busca(texto_busca) if texto_busca else None
 
 resultados = []
 try:
+    # Fronteira com o mundo externo (rede e disco): único try/except do app.
+    # O backlog é lido do arquivo uma única vez por sessão.
+    st.session_state.update(
+        backlog=ler_backlog(), backlog_carregado=True
+    ) if not st.session_state["backlog_carregado"] else None
+
     token = (
         (st.session_state["token"] or obter_token(client_id, client_secret))
         if texto_limpo
@@ -53,6 +61,8 @@ try:
     resultados = list(map(traduzir_jogo, brutos)) if brutos else []
 except requests.RequestException:
     st.error("Não foi possível falar com a IGDB. Verifique sua conexão.")
+except ERROS_ARMAZENAMENTO:
+    st.error("Não foi possível acessar o banco de dados (dados/backlog.db).")
 
 BOTOES = (
     ("Quero jogar", "quero_jogar"),
@@ -61,7 +71,10 @@ BOTOES = (
 )
 
 adicionar = lambda jogo, status: st.session_state.update(
-    backlog=st.session_state["backlog"] + [{**jogo, "status": status, "horas_jogadas": 0.0}]
+    backlog=(
+        salvar_jogo({**jogo, "status": status, "horas_jogadas": 0.0}),
+        ler_backlog(),
+    )[-1]
 )
 
 mostrar_jogo = lambda jogo: (
