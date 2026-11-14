@@ -3,10 +3,10 @@ import re
 import time
 from functools import reduce
 
-import pandas as pd
 import plotly.graph_objects as go
 import requests
 import streamlit as st
+from st_keyup import st_keyup
 
 from src.igdb.cliente import obter_token, consultar_jogos, token_valido, consultar_com_renovacao
 from src.dominio.traducao import limpar_texto_busca, traduzir_jogo
@@ -44,6 +44,11 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 [data-testid="stDecoration"], #MainMenu, footer { display: none !important; }
 [data-testid="stAppDeployButton"], .stAppDeployButton { display: none !important; }
 header[data-testid="stHeader"] { background: transparent; }
+
+/* Remove o ícone de âncora/link ao lado de todos os títulos */
+h1 a, h2 a, h3 a, h4 a, h5 a, h6 a,
+.header-anchor,
+[data-testid="stHeaderActionElements"] { display: none !important; }
 
 /* Espaçamento do topo */
 .block-container { padding-top: 1rem; padding-bottom: 3rem; max-width: 1400px; }
@@ -166,6 +171,55 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover {
 .selo-finalizado { color: #6ee7b7; background: rgba(52,211,153,0.12); border-color: rgba(52,211,153,0.3); }
 .selo-neutro { color: var(--texto-suave); background: transparent; border-color: var(--borda-suave); }
 
+/* Lista "Todos os jogos" */
+.lista {
+    max-height: 560px;
+    overflow-y: auto;
+    margin-top: 0.25rem;
+    border-top: 1px solid rgba(255,255,255,0.05);
+}
+.lista-linha {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px;
+    transition: background 0.15s ease;
+}
+.lista-linha:last-child { border-bottom: none; }
+.lista-linha:hover { background: rgba(255,255,255,0.04); }
+.lista-capa {
+    flex: 0 0 42px;
+    width: 42px;
+    height: 56px;
+    object-fit: cover;
+    object-position: center top;
+    border-radius: 6px;
+    background: var(--superficie-2);
+}
+.lista-info { flex: 1 1 auto; min-width: 0; }
+.lista-nome {
+    font-weight: 600; font-size: 0.92rem; color: #ffffff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lista-generos {
+    margin-top: 2px; font-size: 12px; color: var(--texto-suave);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lista-status { flex: 0 0 auto; width: 96px; display: flex; justify-content: flex-start; }
+.lista-horas {
+    flex: 0 0 auto; width: 72px; text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem; font-weight: 600; color: var(--texto);
+}
+/* Cores exatas dos status na lista (as mesmas usadas nos gráficos) */
+.lista .selo-jogando { color: #8B5CF6; background: rgba(139,92,246,0.14); border-color: rgba(139,92,246,0.4); }
+.lista .selo-finalizado { color: #10B981; background: rgba(16,185,129,0.14); border-color: rgba(16,185,129,0.4); }
+.lista .selo-quero_jogar { color: #F59E0B; background: rgba(245,158,11,0.14); border-color: rgba(245,158,11,0.4); }
+.lista-contador { text-align: right; color: var(--texto-suave); font-size: 0.8rem; padding-top: 0.2rem; }
+
 /* Botões do conteúdo */
 .stButton button, [data-testid="stPopover"] button {
     width: 100%;
@@ -202,6 +256,9 @@ div[data-testid="stTextInput"] input {
 div[data-baseweb="select"] > div {
     border-radius: 10px; background: var(--superficie); border-color: var(--borda-suave);
 }
+
+/* Busca ao vivo (componente em iframe): só dá para estilizar o contêiner */
+iframe[title="st_keyup.st_keyup"] { border-radius: 10px; color-scheme: dark; }
 
 /* KPIs */
 .kpi-rotulo {
@@ -272,6 +329,19 @@ STATUS_LABEL = {
     "finalizado": "Finalizado",
 }
 
+# Cor fixa de cada status, usada nos gráficos (mesmas cores das pílulas da lista).
+COR_STATUS = {
+    "quero_jogar": "#F59E0B",
+    "jogando": "#8B5CF6",
+    "finalizado": "#10B981",
+}
+
+# Mesmo mapa, indexado pelo nome exibido do status.
+COR_POR_ROTULO = dict(map(
+    lambda par: (STATUS_LABEL[par[0]], par[1]),
+    COR_STATUS.items(),
+))
+
 BOTOES = (
     ("Quero jogar", "quero_jogar"),
     ("Jogando", "jogando"),
@@ -288,7 +358,7 @@ TODOS_GENEROS = "Todos os gêneros"
 
 COLUNAS_GRADE = 5
 
-PALETA = ["#7c5cff", "#22d3ee", "#34d399", "#a78bfa", "#60a5fa"]
+COR_PADRAO = "#7c5cff"
 
 linhas = lambda itens, n: list(map(lambda i: itens[i:i + n], range(0, len(itens), n)))
 
@@ -372,15 +442,19 @@ _ = cabecalho_pagina(aba_atual)
 # Linha de busca e filtros (os filtros são preenchidos depois da consulta).
 colunas_busca = st.columns([3, 1.3, 1.3]) if aba_atual == "Buscar" else None
 
-texto_busca = (
-    colunas_busca[0].text_input(
-        "Buscar jogo",
-        placeholder="Buscar por nome, ex.: Zelda, Hollow Knight",
-        label_visibility="collapsed",
+# Busca ao vivo: devolve o texto a cada pausa de 300 ms na digitação, sem Enter.
+with (colunas_busca[0] if colunas_busca else st.empty()):
+    texto_busca = (
+        st_keyup(
+            "Buscar jogo",
+            debounce=300,
+            placeholder="Digite o nome do jogo, ex.: Zelda, Hollow Knight",
+            label_visibility="collapsed",
+            key="busca_ao_vivo",
+        )
+        if colunas_busca
+        else None
     )
-    if colunas_busca
-    else None
-)
 
 texto_limpo = limpar_texto_busca(texto_busca) if texto_busca else None
 
@@ -588,6 +662,13 @@ EIXO = dict(showgrid=False, zeroline=False, showline=False)
 
 CONFIG_GRAFICO = {"displayModeBar": False}
 
+# Cor de cada rótulo de status, sempre pelo nome (nunca pela ordem dos dados).
+cores_por_rotulo = lambda rotulos: list(map(
+    lambda rotulo: COR_POR_ROTULO.get(rotulo, COR_PADRAO),
+    rotulos,
+))
+
+# "cor" pode ser um valor único ou uma lista com uma cor por barra.
 grafico_colunas = lambda rotulos, valores, cor: go.Figure(
     go.Bar(
         x=rotulos,
@@ -624,7 +705,7 @@ grafico_rosca = lambda rotulos, valores: go.Figure(
         hole=0.62,
         sort=False,
         textinfo="value",
-        marker=dict(colors=PALETA, line=dict(color="#141722", width=2)),
+        marker=dict(colors=cores_por_rotulo(rotulos), line=dict(color="#141722", width=2)),
     )
 ).update_layout(
     **{**LAYOUT_BASE, "showlegend": True},
@@ -638,6 +719,39 @@ mostrar_grafico = lambda figura: st.plotly_chart(
 kpi = lambda coluna, rotulo, valor: coluna.container(border=True).markdown(
     f'<div class="kpi-rotulo">{rotulo}</div><div class="kpi-valor">{valor}</div>',
     unsafe_allow_html=True,
+)
+
+# Linha da lista "Todos os jogos": capa, nome + gêneros, status e horas.
+capa_lista = lambda url: (
+    f'<img class="lista-capa" src="{esc(capa_hd(url))}" loading="lazy" alt="Capa do jogo">'
+    if url
+    else '<div class="lista-capa capa-vazia"></div>'
+)
+
+generos_lista = lambda jogo: (
+    " &bull; ".join(map(esc, jogo["genero"][:3])) or "Sem gênero"
+)
+
+linha_lista = lambda jogo: (
+    '<div class="lista-linha">'
+    + capa_lista(jogo["capa"])
+    + '<div class="lista-info">'
+    + f'<div class="lista-nome" title="{esc(jogo["nome"])}">{esc(jogo["nome"])}</div>'
+    + f'<div class="lista-generos">{generos_lista(jogo)}</div>'
+    + "</div>"
+    + f'<div class="lista-status">{selo_status(jogo["status"])}</div>'
+    + f'<div class="lista-horas">{float(jogo["horas_jogadas"]):.1f} h</div>'
+    + "</div>"
+)
+
+lista_html = lambda backlog: (
+    '<div class="lista">' + "".join(map(linha_lista, backlog)) + "</div>"
+)
+
+contador_html = lambda n: (
+    f'<div class="lista-contador">{n} jogo na biblioteca</div>'
+    if n == 1
+    else f'<div class="lista-contador">{n} jogos na biblioteca</div>'
 )
 
 if aba_atual == "Estatísticas":
@@ -671,7 +785,9 @@ if aba_atual == "Estatísticas":
             _ = st.caption("Sem dados ainda.")
         else:
             _ = mostrar_grafico(grafico_colunas(
-                list(horas_legivel.keys()), list(horas_legivel.values()), "#7c5cff"
+                list(horas_legivel.keys()),
+                list(horas_legivel.values()),
+                cores_por_rotulo(horas_legivel.keys()),
             ))
 
     with col_c.container(border=True):
@@ -688,25 +804,10 @@ if aba_atual == "Estatísticas":
 
     if st.session_state["backlog"]:
         with st.container(border=True):
-            _ = titulo_secao("Todos os jogos")
-            tabela = pd.DataFrame(list(map(
-                lambda j: {
-                    "Capa": capa_hd(j["capa"]) if j["capa"] else None,
-                    "Jogo": j["nome"],
-                    "Status": STATUS_LABEL.get(j["status"], j["status"]),
-                    "Gêneros": ", ".join(j["genero"]) or "Sem gênero",
-                    "Horas": float(j["horas_jogadas"]),
-                },
-                st.session_state["backlog"],
-            )))
-            _ = st.dataframe(
-                tabela,
-                hide_index=True,
-                column_config={
-                    "Capa": st.column_config.ImageColumn("Capa", width="small"),
-                    "Jogo": st.column_config.TextColumn("Jogo"),
-                    "Status": st.column_config.TextColumn("Status"),
-                    "Gêneros": st.column_config.TextColumn("Gêneros"),
-                    "Horas": st.column_config.NumberColumn("Horas", format="%.1f h"),
-                },
+            cab_titulo, cab_contador = st.columns([3, 2])
+            _ = cab_titulo.markdown("##### Todos os jogos")
+            _ = cab_contador.markdown(
+                contador_html(len(st.session_state["backlog"])),
+                unsafe_allow_html=True,
             )
+            _ = st.markdown(lista_html(st.session_state["backlog"]), unsafe_allow_html=True)
