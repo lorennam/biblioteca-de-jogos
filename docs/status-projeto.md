@@ -119,7 +119,7 @@ biblioteca-de-jogos/
 - [x] Testar `contagem_por_genero` com um jogo de `"genero": []`, sozinho e misturado aos outros.
 - [x] Testar `backlog_sqlite.py` isoladamente (14/11, passou).
 - [x] Busca real de "Zelda" no app e adicionar com "Quero jogar" (14/11: o jogo foi gravado no banco).
-- [ ] Rodar `tests/teste_token.py` na máquina (passou na sandbox em 14/11); a partir da raiz: `python -m tests.teste_token`.
+- [x] Rodar `tests/teste_token.py` na máquina (passou na sandbox em 14/11); a partir da raiz: `python -m tests.teste_token`.
 - [ ] Rodar os `assert` de `traduzir_jogo` no `teste.py` e testar sobre um item real da IGDB, conferindo `https:` na capa, gêneros como texto e ausência de `status`.
 - [ ] **F5** na página: o jogo adicionado deve continuar na aba "Quero jogar".
 - [ ] Clicar de novo no mesmo jogo: não deve duplicar.
