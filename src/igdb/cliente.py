@@ -9,6 +9,8 @@ CABECALHO_AUTORIZACAO = "Authorization"
 
 MARGEM_SEGURANCA = 60
 
+TIPOS_PERMITIDOS = (0, 1, 2, 4, 8, 9, 10)
+
 calcular_expiracao = lambda agora, expires_in, margem=MARGEM_SEGURANCA: (
     agora + expires_in - margem
 )
@@ -46,7 +48,12 @@ obter_token = lambda client_id, client_secret: (
     )
 )
 
-montar_consulta = lambda texto: f'search "{texto}";\nfields id, name, cover.url, genres.name;\nlimit 10;'
+montar_consulta = lambda texto: (
+    f'search "{texto}";\n'
+    f'fields id, name, cover.url, genres.name, game_type;\n'
+    f'where game_type = ({",".join(map(str, TIPOS_PERMITIDOS))});\n'
+    f'limit 10;'
+)
 
 consultar_jogos = lambda token, client_id, texto: (
     lambda resposta: (
@@ -59,7 +66,7 @@ consultar_jogos = lambda token, client_id, texto: (
             CABECALHO_CLIENT_ID: client_id,
             CABECALHO_AUTORIZACAO: f"Bearer {token}",
         },
-        data=montar_consulta(texto),
+        data=montar_consulta(texto),    
         timeout=10,
     )
 )
