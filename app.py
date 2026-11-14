@@ -11,7 +11,14 @@ from st_keyup import st_keyup
 from src.igdb.cliente import obter_token, consultar_jogos, token_valido, consultar_com_renovacao
 from src.dominio.traducao import limpar_texto_busca, traduzir_jogo
 from src.dominio.estatisticas import filtrar_por_status, resumo
-from src.armazenamento.backlog_sqlite import ler_backlog, salvar_jogo, ERROS_ARMAZENAMENTO
+from src.dominio.regras import somar_horas
+from src.armazenamento.backlog_sqlite import (
+    ler_backlog,
+    salvar_jogo,
+    atualizar_horas,
+    remover_jogo,
+    ERROS_ARMAZENAMENTO,
+)
 
 st.set_page_config(
     page_title="Biblioteca de Jogos",
@@ -553,6 +560,51 @@ mover = lambda jogo, status: st.session_state.update(
     )[-1]
 )
 
+# Soma as horas digitadas no cartão (somar_horas cria um jogo novo), grava no
+# banco, recarrega a lista e zera o campo numérico daquele jogo.
+somar = lambda jogo: st.session_state.update(
+    backlog=(
+        atualizar_horas(somar_horas(jogo, st.session_state[f"horas-{jogo['id']}"])),
+        ler_backlog(),
+    )[-1],
+    **{f"horas-{jogo['id']}": 0.0},
+)
+
+# Remove o jogo do banco e recarrega a lista.
+remover = lambda jogo: st.session_state.update(
+    backlog=(remover_jogo(jogo["id"]), ler_backlog())[-1]
+)
+
+# Menu "Mais opções" do cartão do backlog: somar horas e remover da biblioteca.
+menu_extra = lambda cartao, jogo: (
+    lambda menu: (
+        menu.number_input(
+            "Horas a somar",
+            min_value=0.0,
+            step=0.5,
+            key=f"horas-{jogo['id']}",
+        ),
+        menu.button(
+            "Somar horas",
+            key=f"somar-{jogo['id']}",
+            on_click=somar,
+            args=(jogo,),
+            use_container_width=True,
+        ),
+        menu.button(
+            "Remover da biblioteca",
+            key=f"rm-{jogo['id']}",
+            on_click=remover,
+            args=(jogo,),
+            use_container_width=True,
+        ),
+    )
+)(cartao.popover(
+    "Mais opções",
+    icon=":material/more_horiz:",
+    use_container_width=True,
+))
+
 mapa_status = status_por_id(st.session_state["backlog"])
 
 # Cartão de resultado da busca: capa HD, título, pílulas em uma linha e menu de status.
@@ -592,7 +644,7 @@ cartao_backlog = lambda coluna, jogo: (
             bloco_info(
                 jogo["nome"],
                 selo_status(jogo["status"])
-                + pilula(f"{jogo['horas_jogadas']} h", "pilula-suave")
+                + pilula(f"{jogo['horas_jogadas']:.1f} h", "pilula-suave")
                 + pilulas_genero(jogo, 1),
             ),
             unsafe_allow_html=True,
@@ -612,6 +664,7 @@ cartao_backlog = lambda coluna, jogo: (
             icon=":material/swap_horiz:",
             use_container_width=True,
         )),
+        menu_extra(cartao, jogo),
     )
 )(coluna.container(border=True))
 
