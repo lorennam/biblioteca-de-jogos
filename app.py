@@ -1,7 +1,8 @@
 import streamlit as st
+import time
 import requests
 import pandas as pd
-from src.igdb.cliente import obter_token, consultar_jogos
+from src.igdb.cliente import obter_token, consultar_jogos, token_valido, consultar_com_renovacao
 from src.dominio.traducao import limpar_texto_busca, traduzir_jogo
 from src.dominio.estatisticas import filtrar_por_status, resumo
 from src.armazenamento.backlog_sqlite import ler_backlog, salvar_jogo, ERROS_ARMAZENAMENTO
@@ -43,6 +44,34 @@ texto_busca = (
 
 texto_limpo = limpar_texto_busca(texto_busca) if texto_busca else None
 
+# Pede um token novo, guarda token e vencimento na sessão e devolve o token
+# (ou None se a Twitch recusar; nesse caso a sessão não é alterada).
+renovar_token = lambda: (
+    lambda registro: (
+        (
+            st.session_state.update(
+                token=registro["token"], token_expira_em=registro["expira_em"]
+            ),
+            registro["token"],
+        )[-1]
+        if registro
+        else None
+    )
+)(obter_token(client_id, client_secret))
+
+# Reaproveita o token da sessão enquanto estiver valido; senão, renova.
+token_atual = lambda: (
+    st.session_state["token"]
+    if token_valido(
+        st.session_state["token"], st.session_state["token_expira_em"], time.time()
+    )
+    else renovar_token()
+)
+
+consultar = lambda token: (
+    consultar_jogos(token, client_id, texto_limpo) if token else None
+)
+
 resultados = []
 try:
     # Fronteira com o mundo externo (rede e disco): único try/except do app.
@@ -51,13 +80,11 @@ try:
         backlog=ler_backlog(), backlog_carregado=True
     ) if not st.session_state["backlog_carregado"] else None
 
-    token = (
-        (st.session_state["token"] or obter_token(client_id, client_secret))
+    brutos = (
+        consultar_com_renovacao(consultar, renovar_token, token_atual())
         if texto_limpo
         else None
     )
-    st.session_state["token"] = token or st.session_state["token"]
-    brutos = consultar_jogos(token, client_id, texto_limpo) if token else None
     resultados = list(map(traduzir_jogo, brutos)) if brutos else []
 except requests.RequestException:
     st.error("Não foi possível falar com a IGDB. Verifique sua conexão.")

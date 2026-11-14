@@ -8,7 +8,8 @@ Projeto em Python com Streamlit (interface) e API da IGDB (dados dos jogos), seg
 
 ## Decisões já tomadas
 
-- **Interface:** Streamlit
+- **Interface:** Streamlit (mantido em 14/11; ver "Frontend" abaixo). Para rodar no Windows: `python -m streamlit run app.py` (o comando `streamlit` direto não foi encontrado no PATH).
+- **Frontend:** continuar no Streamlit. Astro foi avaliado e descartado por ora: exigiria reescrever a interface em JS/TS, criar uma API (FastAPI/Flask) entre o frontend e o Python, e foge do foco da disciplina (paradigma funcional em Python). Só vale reconsiderar se o projeto virar portfólio ou for publicado para outras pessoas; nesse caso `dominio/`, `armazenamento/` e `igdb/` seriam reaproveitados atrás de uma API.
 - **Persistência:** **SQLite** em `dados/backlog.db` (substitui o JSON, decidido em 14/11). Motivos: chave primária resolve duplicatas, `UPDATE` simples para as horas, escrita mais segura que reescrever um arquivo inteiro, e o módulo é isolado do resto do app.
 - **Tabela `jogos`:** `id` (INTEGER, chave primária), `nome`, `capa`, `genero` (texto JSON com a lista), `status`, `horas_jogadas` (REAL, padrão `0.0`). Sem `CHECK` no status por enquanto (a validação fica no domínio).
 - **Operações do banco:** cada operação abre e fecha a própria conexão (simples e seguro com as threads do Streamlit). `salvar_jogo` faz *upsert*: jogo novo entra; jogo com mesmo `id` só troca o `status` e preserva as `horas_jogadas`.
@@ -17,6 +18,8 @@ Projeto em Python com Streamlit (interface) e API da IGDB (dados dos jogos), seg
 - **Horas jogadas:** começam em `0.0` ao adicionar; atualização por soma, criando um novo registro (imutabilidade) no Python e gravando o valor novo no banco.
 - **Busca:** por texto digitado, com até 10 resultados (`limit 10`).
 - **Falhas de rede e de armazenamento:** um único `try` no `app.py`, na fronteira com o mundo externo, com dois `except`: `requests.RequestException` (IGDB) e `ERROS_ARMAZENAMENTO` (tupla exportada por `backlog_sqlite.py`: `OSError`, `sqlite3.Error`, `ValueError`). Dentro das funções de rede, erros HTTP viram `None`; as funções de banco deixam o erro subir.
+- **Token da Twitch (14/11):** `obter_token` devolve `{"token", "expira_em"}` (ou `None` se falhar). O vencimento é agora + `expires_in` − `MARGEM_SEGURANCA` (60 s) e fica em `st.session_state["token"]` e `st.session_state["token_expira_em"]`. A validade é checada por `token_valido(token, expira_em, agora)` (pura, recebe o "agora" como argumento, o que a torna testável); se o token estiver inválido, `token_atual` renova antes da consulta. `obter_token` também ganhou `timeout=10`.
+- **Retentativa da consulta (14/11):** `consultar_com_renovacao(consultar, renovar, token)`, função pura de ordem superior. Se a consulta devolver `None` e houver token, pede um token novo uma única vez e tenta de novo. Lista vazia (`[]`) é resultado válido e não conta como falha (comparação com `is None`, não com `or`).
 - **Banco inexistente ou corrompido:** inexistente → o banco e a pasta `dados/` são criados vazios ao abrir; corrompido → o erro sobe até a fronteira e o app mostra uma mensagem, sem sobrescrever nada.
 - **Estados válidos:** tupla `ESTADOS_VALIDOS`, com normalização por `strip().lower()`.
 - **Capa padrão:** expressão condicional, com constante `CAPA_PADRAO` apontando para `placehold.co` (substitui o `via.placeholder.com`).
@@ -46,6 +49,7 @@ biblioteca-de-jogos/
 │   └── backlog.db          # dados do usuário (não versionar; criado pelo app)
 ├── .streamlit/
 │   └── secrets.toml        # credenciais (não versionar)
+├── tests/                  # testes com assert (teste.py, teste_token.py, ...)
 ├── .gitignore              # cobre .streamlit/, dados/ e dados/backlog.db
 └── requirements.txt        # feito
 ```
@@ -56,7 +60,7 @@ biblioteca-de-jogos/
 
 1. **Ambiente:** pasta do projeto criada, `.streamlit/secrets.toml` com `client_id` e `client_secret` da IGDB (agora lido pelo `app.py` via `st.secrets`; formato corrigido em 11/11), estrutura de pastas montada no VS Code, `.gitignore` conferido.
 2. **Constantes em `cliente.py`:** `URL_TOKEN`, `URL_JOGOS`, `CABECALHO_CLIENT_ID` e `CABECALHO_AUTORIZACAO`. Endereços confirmados na documentação.
-3. **`obter_token`:** lambda que faz POST para a Twitch com `grant_type=client_credentials` e devolve o `access_token`, ou `None` em caso de falha. **Testado:** o token foi obtido com sucesso.
+3. **`obter_token`:** lambda que faz POST para a Twitch com `grant_type=client_credentials` e devolve o `access_token`, ou `None` em caso de falha. **Testado:** o token foi obtido com sucesso. (Em 14/11 passou a devolver `{"token", "expira_em"}` e ganhou `timeout=10`; ver item 14.)
 4. **`consultar_jogos`:** lambda que faz POST para a IGDB com os cabeçalhos e a consulta, e devolve a lista de jogos ou `None`. **Testado:** retornou 10 jogos com `cover.url` e `genres.name` expandidos.
 5. **`montar_consulta`:** lambda pura que devolve a string Apicalypse a partir do texto limpo. Foi separada de `consultar_jogos`. **Testada** com `"Zelda"`: o texto aparece na consulta e ela tem três linhas.
 6. **`limpar_texto_busca`:** remove aspas duplas e espaços das extremidades; devolve `None` para texto vazio. **Testada** com três casos: texto normal, com aspas e espaços, e só espaços (agora com `assert`, em `teste.py`). Já está em `src/dominio/traducao.py`.
@@ -81,6 +85,14 @@ biblioteca-de-jogos/
     - **Testado** em 14/11 com `assert` no `teste.py`, usando banco temporário: banco vazio, ida e volta (acentos, `[]` de gêneros), upsert preservando horas e arquivo inválido gerando erro tratável. **Verificado no app:** um jogo adicionado como "quero_jogar" apareceu no `dados/backlog.db` com os campos corretos.
 12. **`app.py` ligado à persistência (14/11):** import de `backlog_sqlite`, flag `backlog_carregado`, leitura do banco dentro do `try`, `adicionar` chamando `salvar_jogo` + `ler_backlog()` e novo `except ERROS_ARMAZENAMENTO`.
 13. **Verificação de `...` soltos no `app.py` (14/11):** nenhuma linha termina em `...` e o arquivo não tem a expressão `Ellipsis`; se o aviso voltar a aparecer na tela, reabrir o item.
+14. **Renovação do token (14/11):** em `src/igdb/cliente.py`, todas em lambdas:
+    - `calcular_expiracao(agora, expires_in, margem)`: pura; instante de renovação (agora + `expires_in` − margem).
+    - `token_valido(token, expira_em, agora)`: pura; o token existe e `agora < expira_em`.
+    - `montar_registro_token(dados, agora)`: pura; converte a resposta da Twitch no registro `{"token", "expira_em"}`.
+    - `consultar_com_renovacao(consultar, renovar, token)`: pura (recebe as funções como argumento); renova uma única vez e repete a consulta se vier `None`.
+    - `obter_token`: agora devolve o registro (ou `None`) e tem `timeout=10`.
+    - No `app.py`: lambdas `renovar_token` (atualiza `token` e `token_expira_em` na sessão), `token_atual` (reaproveita se válido, senão renova) e `consultar`; o bloco 6 chama `consultar_com_renovacao(consultar, renovar_token, token_atual())`.
+    - **Testado** em 14/11 (sandbox) com `tests/teste_token.py`: contas de vencimento, bordas do `token_valido` (limite exato e `0.0` inicial), `obter_token` com resposta 200/400 simulada e quatro cenários do retry (sem falha, falha e sucesso, falha sempre, sem token).
 
 ---
 
@@ -93,9 +105,9 @@ biblioteca-de-jogos/
 - [x] **Procurar `...` soltos no `app.py`:** conferido em 14/11, não há nenhum (ver item 13 acima).
 - [ ] **Mover `traduzir_jogo`** para `src/dominio/traducao.py` e remover a versão antiga do `teste.py` (código entregue em 11/11; falta colar).
 - [ ] **Remover os `print` de teste de `traducao.py`.** Eles aparecem toda vez que o módulo é importado.
-- [ ] **Usar `montar_consulta(texto)`** dentro de `consultar_jogos`, no lugar do f-string fixo.
+- [x] **Usar `montar_consulta(texto)`** dentro de `consultar_jogos`, no lugar do f-string fixo (conferido em 14/11: já estava feito no `cliente.py`).
 - [ ] **Remover o `print` do token** do `teste.py` e não compartilhar o token de novo.
-- [ ] **Conferir a assinatura das funções de `cliente.py`:** o bloco 6 assume `obter_token(client_id, client_secret)` e `consultar_jogos(token, client_id, texto)`; ajustar as chamadas no `app.py` se forem diferentes. (A busca real funcionou em 14/11, então provavelmente já estão certas; confirmar.)
+- [x] **Conferir a assinatura das funções de `cliente.py`:** conferido em 14/11 com o arquivo real; `obter_token(client_id, client_secret)` e `consultar_jogos(token, client_id, texto)` batem com as chamadas do `app.py`.
 - [ ] **Apagar os restos do JSON:** remover `src/armazenamento/backlog_json.py` e `dados/backlog.json`, se existirem.
 - [ ] **Testar a fronteira de erros** desligando a internet.
 - [ ] **Centralizar `ESTADOS_VALIDOS`:** hoje está definida em `estatisticas.py`; decidir se fica ali ou em um módulo comum, para a interface, as regras de validação e (se quiser) o `CHECK` do banco reaproveitarem a mesma tupla.
@@ -107,6 +119,7 @@ biblioteca-de-jogos/
 - [x] Testar `contagem_por_genero` com um jogo de `"genero": []`, sozinho e misturado aos outros.
 - [x] Testar `backlog_sqlite.py` isoladamente (14/11, passou).
 - [x] Busca real de "Zelda" no app e adicionar com "Quero jogar" (14/11: o jogo foi gravado no banco).
+- [ ] Rodar `tests/teste_token.py` na máquina (passou na sandbox em 14/11); a partir da raiz: `python -m tests.teste_token`.
 - [ ] Rodar os `assert` de `traduzir_jogo` no `teste.py` e testar sobre um item real da IGDB, conferindo `https:` na capa, gêneros como texto e ausência de `status`.
 - [ ] **F5** na página: o jogo adicionado deve continuar na aba "Quero jogar".
 - [ ] Clicar de novo no mesmo jogo: não deve duplicar.
@@ -128,13 +141,15 @@ biblioteca-de-jogos/
 - [x] Bloco 8: abas do backlog (jogando, quero jogar, finalizado). Commit: `feat(app): exibe abas do backlog por status`.
 - [x] Bloco 9: estatísticas (chama `resumo(jogos)` e exibe os valores). Commit: `feat(app): exibe estatísticas do backlog`.
 - [ ] Commit da persistência: `feat(armazenamento): persiste o backlog em SQLite` (módulo) e `feat(app): liga o backlog ao banco SQLite` (app).
+- [ ] Commit da renovação do token: `feat(igdb): renova o token da Twitch antes do vencimento` (`cliente.py` + `app.py` + `tests/teste_token.py`).
 - [ ] Passada de visual (layout e estilo) depois que tudo funcionar; ideia: trocar `t_thumb` por `t_cover_big` na URL da capa se as imagens ficarem pequenas; tema via `.streamlit/config.toml`.
 
 ### Renovação do token
 
-- [ ] Guardar também o `expires_in` e o instante de criação do token, para decidir quando renovar (o campo `token_expira_em` já existe no estado da sessão, mas ainda não é usado).
-- [ ] Verificação de validade do token feita por expressão condicional (hoje o bloco 6 só reaproveita o token guardado, sem checar vencimento).
-- [ ] Ao receber `None` da consulta, pedir um token novo uma única vez e tentar de novo.
+- [x] Guardar também o `expires_in` e o instante de criação do token, para decidir quando renovar (`obter_token` devolve `{"token", "expira_em"}`; `token_expira_em` da sessão agora é usado).
+- [x] Verificação de validade do token feita por expressão condicional (`token_valido` + `token_atual` no `app.py`).
+- [x] Ao receber `None` da consulta, pedir um token novo uma única vez e tentar de novo (`consultar_com_renovacao`).
+- [ ] Testar no app: buscas normais continuam funcionando e, sabotando o token da sessão (valor inválido com `token_expira_em` no futuro), a primeira consulta falha e a retentativa com token novo funciona sem o usuário perceber.
 
 ### Persistência (`src/armazenamento/backlog_sqlite.py`)
 
@@ -155,7 +170,7 @@ biblioteca-de-jogos/
 
 - [ ] Filtrar resultados da busca para reduzir edições de fã e expansões na lista, já que a busca por aproximação pode trazer itens pouco relevantes.
 - [ ] Imagem padrão local, no lugar do serviço externo `placehold.co`, que também pode sair do ar.
-- [ ] Mover os testes de `teste.py` para uma pasta própria.
+- [x] Mover os testes de `teste.py` para uma pasta própria (feito em 14/11: pasta `tests/` na raiz). Como os testes importam `src.*`, rodar a partir da raiz do projeto com `python -m tests.<nome>` (ex.: `python -m tests.teste_token`); `python tests/teste_token.py` não acha o `src`.
 - [ ] Se o app for publicado: o disco de serviços de hospedagem costuma ser temporário e o banco seria compartilhado entre todos os visitantes; seria preciso um banco externo e separar os dados por usuário.
 - [ ] Opcional: importar para o SQLite jogos de teste que estavam no antigo `backlog.json`, se houver algum que valha manter.
 
@@ -168,4 +183,4 @@ biblioteca-de-jogos/
 
 ## Próximo passo sugerido
 
-Terminar os testes do app listados acima (F5, duplicata, mudar de status, reiniciar o servidor, estatísticas) e fazer o commit da persistência. Em seguida: o **botão de horas jogadas** (função de `UPDATE` no `backlog_sqlite.py` + campo na interface), fechar as pendências de `traducao.py` e `cliente.py` (colar `traduzir_jogo`, remover os `print`, usar `montar_consulta`), testar a fronteira de erros sem internet, a renovação do token e, por fim, a passada de visual.
+Rodar `tests/teste_token.py` e testar a renovação do token no app, terminar os testes da persistência listados acima (F5, duplicata, mudar de status, reiniciar o servidor, estatísticas) e fazer os commits (persistência e token). Em seguida: o **botão de horas jogadas** (função de `UPDATE` no `backlog_sqlite.py` + campo na interface), fechar as pendências de `traducao.py` (colar `traduzir_jogo` e remover os `print`), testar a fronteira de erros sem internet e, por fim, a passada de visual.
