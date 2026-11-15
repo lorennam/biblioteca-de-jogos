@@ -6,20 +6,22 @@ Princípios aplicados (SKILL.md):
 - feedback no :active (scale 0.97) e hover só em dispositivos com mouse;
 - entrada a cada troca de tela: o cabeçalho da página define --anim-entrada (um nome de
   keyframes por aba), então o nome muda e a animação recomeça mesmo com o DOM reaproveitado;
-- stagger curto (35 ms por coluna) e versão só-fade em reduced-motion;
+- stagger curto (40 ms por coluna) e versão só-fade em reduced-motion;
+- entrada de página abaixo de 300 ms (troca de aba acontece dezenas de vezes por dia);
+- prefers-contrast: more com bordas e texto secundário mais fortes;
 - tracking negativo em texto grande, levemente positivo em texto pequeno;
 - um único vocabulário de cor para status (cards, lista e gráficos).
 """
 
 ESTILO = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
 :root {
-    --destaque: #7c5cff;
-    --destaque-claro: #b4a2ff;
-    --ciano: #22d3ee;
-    --verde: #34d399;
+    /* Acento único do app: nav ativo, hover/foco de botão, KPI padrão e legendas */
+    --destaque: #8b5cf6;
+    --destaque-claro: #a78bfa;
+    --destaque-rgb: 139, 92, 246;
     --fundo: #0b0d14;
     --superficie: #141722;
     --superficie-2: #1b1f2e;
@@ -32,8 +34,8 @@ ESTILO = """
     --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
     --t-press: 140ms;
     --t-hover: 160ms;
-    --t-enter: 420ms;
-    --atraso-pagina: 90ms;   /* o título entra primeiro, o conteúdo logo depois */
+    --t-enter: 280ms;        /* troca de aba é frequente: entrada < 300 ms */
+    --atraso-pagina: 60ms;   /* o título entra primeiro, o conteúdo logo depois */
 }
 
 html, body, [class*="css"] {
@@ -45,15 +47,15 @@ html, body, [class*="css"] {
 
 @keyframes fade-in { from { opacity: 0; } }
 /* Um par por aba (ver cabecalho_pagina no app.py): trocar o NOME reinicia a animação */
-@keyframes entrar-0 { from { opacity: 0; transform: translateY(14px); } }
+@keyframes entrar-0 { from { opacity: 0; transform: translateY(8px); } }
 @keyframes fade-0 { from { opacity: 0; } }
-@keyframes entrar-1 { from { opacity: 0; transform: translateY(14px); } }
+@keyframes entrar-1 { from { opacity: 0; transform: translateY(8px); } }
 @keyframes fade-1 { from { opacity: 0; } }
-@keyframes entrar-2 { from { opacity: 0; transform: translateY(14px); } }
+@keyframes entrar-2 { from { opacity: 0; transform: translateY(8px); } }
 @keyframes fade-2 { from { opacity: 0; } }
-@keyframes entrar-3 { from { opacity: 0; transform: translateY(14px); } }
+@keyframes entrar-3 { from { opacity: 0; transform: translateY(8px); } }
 @keyframes fade-3 { from { opacity: 0; } }
-@keyframes entrar-4 { from { opacity: 0; transform: translateY(14px); } }
+@keyframes entrar-4 { from { opacity: 0; transform: translateY(8px); } }
 @keyframes fade-4 { from { opacity: 0; } }
 @keyframes surgir { from { opacity: 0; transform: scale(0.97); } }
 
@@ -82,18 +84,16 @@ section[data-testid="stSidebar"] .block-container { padding-top: 1.25rem; }
 .marca { display: flex; align-items: center; gap: 12px; padding: 0.25rem 0.25rem 1.1rem; }
 .marca-icone {
     flex: 0 0 auto; width: 36px; height: 36px; border-radius: 10px;
-    display: grid; place-items: center; color: #fff;
-    background: linear-gradient(135deg, var(--destaque), #5b3df5);
-    box-shadow: 0 6px 16px rgba(124, 92, 255, 0.35);
+    display: grid; place-items: center; color: var(--fundo);
+    background: var(--destaque);
 }
-.marca-nome { font-weight: 700; font-size: 0.95rem; letter-spacing: -0.01em; color: var(--texto); line-height: 1.2; }
+.marca-nome { font-weight: 600; font-size: 0.95rem; letter-spacing: -0.01em; color: var(--texto); line-height: 1.2; }
 .marca-sub { font-size: 0.75rem; color: var(--texto-suave); line-height: 1.3; margin-top: 1px; }
 
 .rotulo-sidebar {
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
     color: var(--texto-suave);
     padding: 0 0.25rem 0.75rem;
     margin-bottom: 0.75rem;
@@ -118,7 +118,7 @@ section[data-testid="stSidebar"] .stButton button {
 section[data-testid="stSidebar"] .stButton button > div { justify-content: flex-start; width: 100%; }
 section[data-testid="stSidebar"] .stButton button p { text-align: left; }
 section[data-testid="stSidebar"] .stButton button[data-testid="stBaseButton-primary"] {
-    background: rgba(124, 92, 255, 0.16) !important;
+    background: rgba(var(--destaque-rgb), 0.14) !important;
     color: var(--texto) !important;
     font-weight: 600;
     box-shadow: inset 2px 0 0 var(--destaque) !important;  /* "você está aqui" */
@@ -129,14 +129,14 @@ section[data-testid="stSidebar"] .stButton button[data-testid="stBaseButton-prim
         color: var(--texto) !important;
     }
     section[data-testid="stSidebar"] .stButton button[data-testid="stBaseButton-primary"]:hover {
-        background: rgba(124, 92, 255, 0.24) !important;
+        background: rgba(var(--destaque-rgb), 0.22) !important;
     }
 }
 
 /* ---------- Cabeçalho de página (texto grande: tracking negativo, leading curto) ---------- */
 .cabecalho {
     font-size: clamp(1.5rem, 1.25rem + 0.9vw, 1.9rem);
-    font-weight: 800;
+    font-weight: 600;
     letter-spacing: -0.02em;
     line-height: 1.1;
     color: var(--texto);
@@ -145,12 +145,12 @@ section[data-testid="stSidebar"] .stButton button[data-testid="stBaseButton-prim
 }
 .subtitulo {
     color: var(--texto-suave); font-size: 0.92rem; line-height: 1.5; margin: 0.35rem 0 1.25rem;
-    animation: var(--anim-entrada, entrar-0) var(--t-enter) var(--ease-out) 70ms backwards;
+    animation: var(--anim-entrada, entrar-0) var(--t-enter) var(--ease-out) 40ms backwards;
 }
-.titulo-secao { font-size: 0.95rem; font-weight: 700; color: var(--texto); margin: 0.1rem 0 0.5rem; }
+.titulo-secao { font-size: 0.95rem; font-weight: 600; color: var(--texto); margin: 0.1rem 0 0.5rem; }
 [data-testid="stMain"] h5 {
     font-size: 0.95rem;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: -0.005em;
     color: var(--texto);
     margin: 0.1rem 0 0.5rem;
@@ -176,7 +176,8 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.capa) {
     transition: transform 200ms var(--ease-out), border-color 200ms ease;
     animation-delay: calc(var(--atraso, 0ms) + var(--atraso-pagina));
 }
-/* Brilho num pseudo-elemento: animar opacity em vez de box-shadow */
+/* Elevação num pseudo-elemento: animar opacity em vez de box-shadow. Sombra neutra,
+   sem tingir de acento — a elevação por si já marca o hover. */
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.capa)::after {
     content: "";
     position: absolute;
@@ -184,23 +185,23 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.capa)::after {
     border-radius: inherit;
     pointer-events: none;
     opacity: 0;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 12px 30px rgba(124, 92, 255, 0.16);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 12px 30px rgba(0, 0, 0, 0.28);
     transition: opacity 200ms var(--ease-out);
 }
 @media (hover: hover) and (pointer: fine) {
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.capa):hover {
         transform: translateY(-2px);
-        border-color: rgba(124, 92, 255, 0.45) !important;
+        border-color: rgba(var(--destaque-rgb), 0.4) !important;
     }
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.capa):hover::after { opacity: 1; }
 }
 
-/* Stagger por coluna (70 ms): cada coluna define --atraso e os blocos dentro herdam.
+/* Stagger por coluna (40 ms): cada coluna define --atraso e os blocos dentro herdam.
    Só decorativo, nunca bloqueia clique. */
-:is([data-testid="stColumn"], [data-testid="column"]):nth-child(2) { --atraso: 70ms; }
-:is([data-testid="stColumn"], [data-testid="column"]):nth-child(3) { --atraso: 140ms; }
-:is([data-testid="stColumn"], [data-testid="column"]):nth-child(4) { --atraso: 210ms; }
-:is([data-testid="stColumn"], [data-testid="column"]):nth-child(5) { --atraso: 280ms; }
+:is([data-testid="stColumn"], [data-testid="column"]):nth-child(2) { --atraso: 40ms; }
+:is([data-testid="stColumn"], [data-testid="column"]):nth-child(3) { --atraso: 80ms; }
+:is([data-testid="stColumn"], [data-testid="column"]):nth-child(4) { --atraso: 120ms; }
+:is([data-testid="stColumn"], [data-testid="column"]):nth-child(5) { --atraso: 160ms; }
 
 /* Grade responsiva: 5 -> 3 -> 2 cards por linha (só linhas que têm cards) */
 @media (max-width: 1200px) {
@@ -237,7 +238,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.capa)::after {
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.capa) [data-testid="stVerticalBlock"] {
     gap: 0.5rem !important;
 }
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.capa) { padding: 0.35rem; }
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.capa) { padding: 6px; }
 
 /* Título em uma linha, com reticências. As margens ficam aqui (nas minhas classes), assim o
    espaçamento não depende de como o Streamlit empilha os elementos. */
@@ -261,13 +262,14 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.capa) { padding: 0.35rem; }
 }
 .pilula-suave { color: var(--texto-suave); background: transparent; }
 
-/* Selos de status: UMA paleta para cards, lista e gráficos */
+/* Selos de status: UMA paleta para cards, lista e gráficos.
+   Se mudar aqui, mudar também COR_STATUS em app.py. */
 .selo {
     display: inline-block; padding: 2px 8px; border-radius: 999px;
     font-size: 11px; font-weight: 600; letter-spacing: 0.01em; white-space: nowrap; border: 1px solid transparent;
 }
 .selo-quero_jogar { color: #F59E0B; background: rgba(245, 158, 11, 0.14); border-color: rgba(245, 158, 11, 0.4); }
-.selo-jogando { color: #A78BFA; background: rgba(139, 92, 246, 0.16); border-color: rgba(139, 92, 246, 0.4); }
+.selo-jogando { color: #60A5FA; background: rgba(59, 130, 246, 0.16); border-color: rgba(59, 130, 246, 0.4); }
 .selo-finalizado { color: #10B981; background: rgba(16, 185, 129, 0.14); border-color: rgba(16, 185, 129, 0.4); }
 .selo-neutro { color: var(--texto-suave); background: transparent; border-color: var(--borda-suave); }
 
@@ -283,6 +285,10 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.capa) { padding: 0.35rem; }
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
     mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
 }
+/* scrollbar-color acima cobre o Firefox; estas regras fazem o mesmo visual no Chrome/Edge */
+.lista::-webkit-scrollbar { width: 8px; }
+.lista::-webkit-scrollbar-track { background: transparent; }
+.lista::-webkit-scrollbar-thumb { background: var(--borda); border-radius: 999px; }
 .lista-linha {
     display: flex;
     align-items: center;
@@ -309,7 +315,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.capa) { padding: 0.35rem; }
 }
 .lista-info { flex: 1 1 auto; min-width: 0; }
 .lista-nome {
-    font-weight: 600; font-size: 0.92rem; color: #ffffff;
+    font-weight: 600; font-size: 0.92rem; color: var(--texto);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .lista-generos {
@@ -343,13 +349,13 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.capa) { padding: 0.35rem; }
 .stButton button:active, [data-testid="stPopover"] button:active { transform: scale(0.97); }
 .stButton button:disabled, [data-testid="stPopover"] button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 .stButton button:focus-visible, [data-testid="stPopover"] button:focus-visible {
-    outline: 2px solid rgba(124, 92, 255, 0.75);
+    outline: 2px solid rgba(var(--destaque-rgb), 0.75);
     outline-offset: 2px;
 }
 @media (hover: hover) and (pointer: fine) {
     .stButton button:hover:not(:disabled), [data-testid="stPopover"] button:hover:not(:disabled) {
         border-color: var(--destaque);
-        background: rgba(124, 92, 255, 0.18);
+        background: rgba(var(--destaque-rgb), 0.14);
         color: #ffffff;
     }
 }
@@ -418,16 +424,16 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.capa) { padding: 0.35rem; }
     opacity: 1;
     cursor: default;
     color: var(--destaque-claro);
-    background: rgba(124, 92, 255, 0.14);
-    border-color: rgba(124, 92, 255, 0.45);
+    background: rgba(var(--destaque-rgb), 0.14);
+    border-color: rgba(var(--destaque-rgb), 0.4);
 }
 [data-testid="stPopoverBody"] .stButton button:disabled::after {
     content: "atual"; margin-left: auto; font-size: 0.68rem; font-weight: 600;
-    letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.8;
+    letter-spacing: 0.02em; opacity: 0.8;
 }
 [data-testid="stPopoverBody"] label p { font-size: 0.78rem; color: var(--texto-suave); }
 [data-testid="stPopoverBody"] [data-testid="stCaptionContainer"] {
-    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    font-size: 0.72rem; font-weight: 500; letter-spacing: 0.01em;
     color: var(--texto-suave); margin-bottom: -0.1rem;
 }
 [data-testid="stPopoverBody"] hr { margin: 0.35rem 0; border-color: var(--borda); }
@@ -449,10 +455,10 @@ div[data-baseweb="select"] > div {
 }
 div[data-baseweb="select"]:focus-within > div {
     border-color: var(--destaque);
-    box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.22);
+    box-shadow: 0 0 0 3px rgba(var(--destaque-rgb), 0.22);
 }
 @media (hover: hover) and (pointer: fine) {
-    div[data-baseweb="select"]:hover > div { border-color: rgba(124, 92, 255, 0.5); }
+    div[data-baseweb="select"]:hover > div { border-color: rgba(var(--destaque-rgb), 0.5); }
 }
 
 /* Busca ao vivo (componente em iframe): só dá para estilizar o contêiner */
@@ -463,8 +469,8 @@ iframe[title="st_keyup.st_keyup"] { border-radius: 10px; color-scheme: dark; }
 
 /* ---------- KPIs ---------- */
 .kpi-rotulo {
-    font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em;
-    text-transform: uppercase; color: var(--texto-suave);
+    font-size: 0.78rem; font-weight: 500; letter-spacing: 0.01em;
+    color: var(--texto-suave);
 }
 .kpi-rotulo::before {
     content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 0.5rem;
@@ -473,7 +479,7 @@ iframe[title="st_keyup.st_keyup"] { border-radius: 10px; color-scheme: dark; }
 }
 .kpi-valor {
     font-size: clamp(1.9rem, 1.5rem + 1vw, 2.3rem);
-    font-weight: 800; letter-spacing: -0.02em; line-height: 1.1;
+    font-weight: 600; letter-spacing: -0.02em; line-height: 1.1;
     font-variant-numeric: tabular-nums;
     color: var(--texto); margin-top: 0.3rem;
 }
@@ -488,16 +494,16 @@ iframe[title="st_keyup.st_keyup"] { border-radius: 10px; color-scheme: dark; }
 .vazio-icone {
     width: 44px; height: 44px; border-radius: 12px; margin-bottom: 0.8rem;
     display: grid; place-items: center; color: var(--destaque-claro);
-    background: rgba(124, 92, 255, 0.12); border: 1px solid rgba(124, 92, 255, 0.25);
+    background: rgba(var(--destaque-rgb), 0.1); border: 1px solid rgba(var(--destaque-rgb), 0.25);
 }
-.vazio-titulo { color: var(--texto); font-weight: 700; font-size: 1.05rem; letter-spacing: -0.01em; margin-bottom: 0.3rem; }
+.vazio-titulo { color: var(--texto); font-weight: 600; font-size: 1.05rem; letter-spacing: -0.01em; margin-bottom: 0.3rem; }
 
 /* ---------- Gráficos em HTML/CSS (sem JS) ---------- */
 .graf { min-height: 260px; display: flex; flex-direction: column; justify-content: center; }
 
 .colunas { display: flex; align-items: flex-end; justify-content: space-around; gap: 18px; padding: 0.5rem 0.25rem 0; }
 .coluna { flex: 1 1 0; max-width: 96px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.coluna-valor { font-size: 0.85rem; font-weight: 700; color: var(--texto); font-variant-numeric: tabular-nums; }
+.coluna-valor { font-size: 0.85rem; font-weight: 600; color: var(--texto); font-variant-numeric: tabular-nums; }
 .coluna-barra { width: 100%; border-radius: 8px 8px 4px 4px; }
 .coluna-rotulo { margin-top: 4px; font-size: 0.75rem; letter-spacing: 0.01em; color: var(--texto-suave); white-space: nowrap; }
 
@@ -515,7 +521,7 @@ iframe[title="st_keyup.st_keyup"] { border-radius: 10px; color-scheme: dark; }
     mask: radial-gradient(farthest-side, transparent 63%, #000 64%);
 }
 .rosca-centro { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
-.rosca-total { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; color: var(--texto); font-variant-numeric: tabular-nums; }
+.rosca-total { font-size: 1.9rem; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; color: var(--texto); font-variant-numeric: tabular-nums; }
 .rosca-legenda { font-size: 0.75rem; letter-spacing: 0.01em; color: var(--texto-suave); }
 .legenda { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; font-size: 0.78rem; color: var(--texto-suave); }
 .legenda-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -527,7 +533,7 @@ iframe[title="st_keyup.st_keyup"] { border-radius: 10px; color-scheme: dark; }
     div[data-testid="stVerticalBlockBorderWrapper"],
     .cabecalho, .subtitulo, .vazio {
         animation-name: var(--anim-fade, fade-0);
-        animation-duration: 300ms;
+        animation-duration: 200ms;
         animation-timing-function: ease;
     }
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.capa) { transition: border-color var(--t-hover) ease; }
@@ -536,6 +542,16 @@ iframe[title="st_keyup.st_keyup"] { border-radius: 10px; color-scheme: dark; }
     [data-baseweb="popover"][data-popper-placement] [data-testid="stPopoverBody"] { animation: fade-in 150ms ease; }
     .stButton button:active, [data-testid="stPopover"] button:active,
     section[data-testid="stSidebar"] .stButton button:active { transform: none; }
+}
+
+/* Contraste alto: bordas e texto secundário mais definidos, sem depender de transparência */
+@media (prefers-contrast: more) {
+    :root {
+        --borda: #4a5170;
+        --borda-suave: rgba(255, 255, 255, 0.28);
+        --texto-suave: #c9ceda;
+    }
+    .pilula, .selo { border-color: currentColor; }
 }
 
 /* Sem o "apagão" de 33% que o Streamlit aplica ao que está desatualizado durante o rerun:

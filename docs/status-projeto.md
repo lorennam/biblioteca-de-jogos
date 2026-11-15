@@ -101,9 +101,8 @@ biblioteca-de-jogos/
 ### Ajustes
 - [x] **`requirements.txt`:** listar `plotly` e `streamlit-keyup` (o `app.py` os importa); `pandas` não é mais importado.
 - [x] **`.gitignore`:** se ainda não feito, ignorar só `.streamlit/secrets.toml` (assim um futuro `config.toml` pode ser versionado) e incluir `__pycache__/` e `*.pyc`. Conferir com `git ls-files dados .streamlit` que nada disso já foi commitado.
-- [ ] **Imagem padrão local**, no lugar do `placehold.co`, que pode sair do ar.
 
 ### Ideias futuras
-- [ ] **Filtrar os resultados da busca** para reduzir edições de fã e expansões, já que a busca por aproximação traz itens pouco relevantes.
+- [x] **Filtrar os resultados da busca** para reduzir edições de fã e expansões, já que a busca por aproximação traz itens pouco relevantes.
 
 ---

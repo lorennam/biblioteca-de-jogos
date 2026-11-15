@@ -82,9 +82,10 @@ STATUS_LABEL = {
 }
 
 # Cor fixa de cada status, usada nos gráficos (mesmas cores das pílulas da lista).
+# Se mudar aqui, mudar também as classes .selo-* em src/interface/estilo.py.
 COR_STATUS = {
     "quero_jogar": "#F59E0B",
-    "jogando": "#8B5CF6",
+    "jogando": "#3B82F6",
     "finalizado": "#10B981",
 }
 
@@ -110,7 +111,7 @@ TODOS_GENEROS = "Todos os gêneros"
 
 COLUNAS_GRADE = 5
 
-COR_PADRAO = "#7c5cff"
+COR_PADRAO = "#8b5cf6"  # acento único do app (igual ao --destaque do CSS), usado com parcimônia
 
 # Ícone de controle (traço), reaproveitado na marca da sidebar e nos estados vazios.
 ICONE_JOGO = (
@@ -148,10 +149,10 @@ capa_hd = lambda url: re.sub(
     f"https:{url}" if url.startswith("//") else url,
 )
 
-capa_html = lambda url: (
-    f'<img class="capa" src="{esc(capa_hd(url))}" loading="lazy" alt="Capa do jogo">'
+capa_html = lambda url, nome: (
+    f'<img class="capa" src="{esc(capa_hd(url))}" loading="lazy" alt="Capa de {esc(nome)}">'
     if url
-    else '<div class="capa capa-vazia"></div>'
+    else f'<div class="capa capa-vazia" role="img" aria-label="Capa de {esc(nome)} indisponível"></div>'
 )
 
 pilula = lambda texto, classe="": f'<span class="pilula {classe}">{esc(texto)}</span>'
@@ -319,38 +320,55 @@ resultados_filtrados = (
     resultados,
 )))
 
-adicionar = lambda jogo, status: st.session_state.update(
-    backlog=(
-        salvar_jogo({**jogo, "status": status, "horas_jogadas": 0.0}),
-        ler_backlog(),
-    )[-1]
+# Feedback de conclusão: o card muda de lugar/selo e o toast confirma o que aconteceu.
+avisar = lambda texto: st.toast(texto, icon=":material/check_circle:")
+
+adicionar = lambda jogo, status: (
+    st.session_state.update(
+        backlog=(
+            salvar_jogo({**jogo, "status": status, "horas_jogadas": 0.0}),
+            ler_backlog(),
+        )[-1]
+    ),
+    avisar(f"**{jogo['nome']}** adicionado em {STATUS_LABEL[status]}"),
 )
 
 # Muda o status de um jogo que já está no backlog, preservando as horas jogadas.
-mover = lambda jogo, status: st.session_state.update(
-    backlog=(
-        salvar_jogo({**jogo, "status": status}),
-        ler_backlog(),
-    )[-1]
+mover = lambda jogo, status: (
+    st.session_state.update(
+        backlog=(
+            salvar_jogo({**jogo, "status": status}),
+            ler_backlog(),
+        )[-1]
+    ),
+    avisar(f"**{jogo['nome']}** movido para {STATUS_LABEL[status]}"),
 )
 
 # Soma as horas digitadas no cartão (somar_horas cria um jogo novo), grava no
 # banco, recarrega a lista e zera o campo numérico daquele jogo.
-somar = lambda jogo: st.session_state.update(
-    backlog=(
-        atualizar_horas(somar_horas(jogo, st.session_state[f"horas-{jogo['id']}"])),
-        ler_backlog(),
-    )[-1],
-    **{f"horas-{jogo['id']}": 0.0},
-)
+somar = lambda jogo: (
+    lambda horas: (
+        st.session_state.update(
+            backlog=(
+                atualizar_horas(somar_horas(jogo, horas)),
+                ler_backlog(),
+            )[-1],
+            **{f"horas-{jogo['id']}": 0.0},
+        ),
+        avisar(f"+{horas:g} h em **{jogo['nome']}**") if horas > 0 else None,
+    )
+)(st.session_state[f"horas-{jogo['id']}"])
 
 # Remove o jogo do banco e recarrega a lista.
 pedir_remocao = lambda jogo: st.session_state.update(**{f"rmc-{jogo['id']}": True})
 cancelar_remocao = lambda jogo: st.session_state.update(**{f"rmc-{jogo['id']}": False})
 
-remover = lambda jogo: st.session_state.update(
-    backlog=(remover_jogo(jogo["id"]), ler_backlog())[-1],
-    **{f"rmc-{jogo['id']}": False},
+remover = lambda jogo: (
+    st.session_state.update(
+        backlog=(remover_jogo(jogo["id"]), ler_backlog())[-1],
+        **{f"rmc-{jogo['id']}": False},
+    ),
+    avisar(f"**{jogo['nome']}** removido da biblioteca"),
 )
 
 # Parte de baixo do menu "Opções" do cartão do backlog: somar horas e remover da biblioteca.
@@ -386,7 +404,7 @@ mapa_status = status_por_id(st.session_state["backlog"])
 # Cartão de resultado da busca: capa HD, título, pílulas em uma linha e menu de status.
 cartao_resultado = lambda coluna, jogo: (
     lambda cartao: (
-        cartao.markdown(capa_html(jogo["capa"]), unsafe_allow_html=True),
+        cartao.markdown(capa_html(jogo["capa"], jogo["nome"]), unsafe_allow_html=True),
         cartao.markdown(
             bloco_info(
                 jogo["nome"],
@@ -415,7 +433,7 @@ cartao_resultado = lambda coluna, jogo: (
 # Cartão do backlog: capa HD, título, status + horas + gênero em uma linha, e botão na base.
 cartao_backlog = lambda coluna, jogo: (
     lambda cartao: (
-        cartao.markdown(capa_html(jogo["capa"]), unsafe_allow_html=True),
+        cartao.markdown(capa_html(jogo["capa"], jogo["nome"]), unsafe_allow_html=True),
         cartao.markdown(
             bloco_info(
                 jogo["nome"],
@@ -563,10 +581,10 @@ kpi = lambda coluna, rotulo, valor, cor=COR_PADRAO: coluna.container(border=True
 )
 
 # Linha da lista "Todos os jogos": capa, nome + gêneros, status e horas.
-capa_lista = lambda url: (
-    f'<img class="lista-capa" src="{esc(capa_hd(url))}" loading="lazy" alt="Capa do jogo">'
+capa_lista = lambda url, nome: (
+    f'<img class="lista-capa" src="{esc(capa_hd(url))}" loading="lazy" alt="Capa de {esc(nome)}">'
     if url
-    else '<div class="lista-capa capa-vazia"></div>'
+    else f'<div class="lista-capa capa-vazia" role="img" aria-label="Capa de {esc(nome)} indisponível"></div>'
 )
 
 generos_lista = lambda jogo: (
@@ -575,7 +593,7 @@ generos_lista = lambda jogo: (
 
 linha_lista = lambda jogo: (
     '<div class="lista-linha">'
-    + capa_lista(jogo["capa"])
+    + capa_lista(jogo["capa"], jogo["nome"])
     + '<div class="lista-info">'
     + f'<div class="lista-nome" title="{esc(jogo["nome"])}">{esc(jogo["nome"])}</div>'
     + f'<div class="lista-generos">{generos_lista(jogo)}</div>'
@@ -604,7 +622,7 @@ if aba_atual == "Estatísticas":
 
     kpis = (
         ("Jogos no backlog", str(resumo_atual["total_jogos"]), COR_PADRAO),
-        ("Horas jogadas", f"{resumo_atual['total_horas']:.1f} h", "#22d3ee"),
+        ("Horas jogadas", f"{resumo_atual['total_horas']:.1f} h", COR_PADRAO),
         ("Jogando agora", str(contagens[1]), COR_STATUS["jogando"]),
         ("Finalizados", str(contagens[2]), COR_STATUS["finalizado"]),
     )
@@ -640,7 +658,7 @@ if aba_atual == "Estatísticas":
             _ = mostrar_grafico(grafico_barras_h(
                 list(map(lambda par: par[0], itens_genero)),
                 list(map(lambda par: par[1], itens_genero)),
-                "#22d3ee",
+                COR_PADRAO,
             ))
 
     if st.session_state["backlog"]:
