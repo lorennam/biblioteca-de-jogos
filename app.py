@@ -194,8 +194,7 @@ ir_para = lambda aba: st.session_state.update(pagina_atual=aba)
 _ = st.sidebar.markdown(
     '<div class="marca">'
     f'<div class="marca-icone">{ICONE_JOGO.format(t=20)}</div>'
-    '<div><div class="marca-nome">Biblioteca de Jogos</div>'
-    '<div class="marca-sub">Seu backlog, em um lugar só</div></div>'
+    '<div><div class="marca-nome">Biblioteca de Jogos</div></div>'
     '</div>'
     '<div class="rotulo-sidebar">Navegação</div>',
     unsafe_allow_html=True,
@@ -580,37 +579,52 @@ kpi = lambda coluna, rotulo, valor, cor=COR_PADRAO: coluna.container(border=True
     unsafe_allow_html=True,
 )
 
-# Linha da lista "Todos os jogos": capa, nome + gêneros, status e horas.
-capa_lista = lambda url, nome: (
-    f'<img class="lista-capa" src="{esc(capa_hd(url))}" loading="lazy" alt="Capa de {esc(nome)}">'
+# "Todos os jogos": só a capa; status e horas aparecem num véu com blur ao passar o mouse.
+capa_tile = lambda url, nome: (
+    f'<img class="tile-capa" src="{esc(capa_hd(url))}" loading="lazy" alt="Capa de {esc(nome)}">'
     if url
-    else f'<div class="lista-capa capa-vazia" role="img" aria-label="Capa de {esc(nome)} indisponível"></div>'
+    else f'<div class="tile-capa tile-vazia" role="img" aria-label="Capa de {esc(nome)} indisponível"></div>'
 )
 
-generos_lista = lambda jogo: (
-    " &bull; ".join(map(esc, jogo["genero"][:3])) or "Sem gênero"
+tile_html = lambda jogo: (
+    f'<div class="tile" tabindex="0" title="{esc(jogo["nome"])}">'
+    + capa_tile(jogo["capa"], jogo["nome"])
+    + '<div class="tile-veu">'
+    + selo_status(jogo["status"])
+    + f'<div class="tile-horas">{float(jogo["horas_jogadas"]):.1f} h</div>'
+    + f'<div class="tile-nome">{esc(jogo["nome"])}</div>'
+    + "</div></div>"
 )
 
-linha_lista = lambda jogo: (
-    '<div class="lista-linha">'
-    + capa_lista(jogo["capa"], jogo["nome"])
-    + '<div class="lista-info">'
-    + f'<div class="lista-nome" title="{esc(jogo["nome"])}">{esc(jogo["nome"])}</div>'
-    + f'<div class="lista-generos">{generos_lista(jogo)}</div>'
-    + "</div>"
-    + f'<div class="lista-status">{selo_status(jogo["status"])}</div>'
-    + f'<div class="lista-horas">{float(jogo["horas_jogadas"]):.1f} h</div>'
-    + "</div>"
+tiles_html = lambda backlog: (
+    '<div class="tiles">' + "".join(map(tile_html, backlog)) + "</div>"
 )
 
-lista_html = lambda backlog: (
-    '<div class="lista">' + "".join(map(linha_lista, backlog)) + "</div>"
+contador_html = lambda n, total: (
+    f'<div class="lista-contador">{n} de {total} jogos</div>'
+    if n != total
+    else f'<div class="lista-contador">{total} {"jogo" if total == 1 else "jogos"} na biblioteca</div>'
 )
 
-contador_html = lambda n: (
-    f'<div class="lista-contador">{n} jogo na biblioteca</div>'
-    if n == 1
-    else f'<div class="lista-contador">{n} jogos na biblioteca</div>'
+# Filtros da lista "Todos os jogos": rótulo exibido -> valor interno.
+FILTROS_STATUS = {
+    "Todos": None,
+    "Finalizados": "finalizado",
+    "Jogando": "jogando",
+    "Quero jogar": "quero_jogar",
+}
+
+# Rótulo exibido -> "decrescente?" (True = mais horas primeiro).
+ORDENS_HORAS = {"Menos horas": False, "Mais horas": True}
+
+filtrar_lista = lambda backlog, status: (
+    backlog if status is None else filtrar_por_status(backlog, status)
+)
+
+ordenar_lista = lambda backlog, ordem: (
+    sorted(backlog, key=lambda j: float(j["horas_jogadas"]), reverse=ORDENS_HORAS[ordem])
+    if ordem
+    else backlog
 )
 
 if aba_atual == "Estatísticas":
@@ -665,8 +679,34 @@ if aba_atual == "Estatísticas":
         with st.container(border=True):
             cab_titulo, cab_contador = st.columns([3, 2])
             _ = cab_titulo.markdown("##### Todos os jogos")
+
+            col_status, col_ordem, _folga = st.columns([3.1, 1.9, 4], vertical_alignment="center")
+            escolha_status = col_status.segmented_control(
+                "Status",
+                list(FILTROS_STATUS),
+                default="Todos",
+                key="lista_filtro_status",
+                label_visibility="collapsed",
+            ) or "Todos"
+            escolha_ordem = col_ordem.segmented_control(
+                "Ordem",
+                list(ORDENS_HORAS),
+                default=None,
+                key="lista_filtro_ordem",
+                label_visibility="collapsed",
+            )
+
+            jogos_lista = ordenar_lista(
+                filtrar_lista(st.session_state["backlog"], FILTROS_STATUS[escolha_status]),
+                escolha_ordem,
+            )
+
             _ = cab_contador.markdown(
-                contador_html(len(st.session_state["backlog"])),
+                contador_html(len(jogos_lista), len(st.session_state["backlog"])),
                 unsafe_allow_html=True,
             )
-            _ = st.markdown(lista_html(st.session_state["backlog"]), unsafe_allow_html=True)
+
+            if jogos_lista:
+                _ = st.markdown(tiles_html(jogos_lista), unsafe_allow_html=True)
+            else:
+                _ = mostrar_vazio("Nenhum jogo nesse filtro", "Troque o status para ver os demais jogos.")

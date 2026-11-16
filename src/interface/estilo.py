@@ -273,63 +273,110 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.capa) { padding: 6px; }
 .selo-finalizado { color: #10B981; background: rgba(16, 185, 129, 0.14); border-color: rgba(16, 185, 129, 0.4); }
 .selo-neutro { color: var(--texto-suave); background: transparent; border-color: var(--borda-suave); }
 
-/* ---------- Lista "Todos os jogos" ---------- */
-.lista {
-    max-height: 560px;
+/* ---------- "Todos os jogos": grade só de capas, detalhes no hover ---------- */
+.tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 14px;
+    max-height: 640px;
     overflow-y: auto;
     margin-top: 0.25rem;
-    padding: 12px 0;
+    padding: 12px 4px;
     scrollbar-width: thin;
     scrollbar-color: var(--borda) transparent;
-    /* borda de rolagem: o conteúdo some em degradê em vez de bater numa linha */
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
     mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
 }
-/* scrollbar-color acima cobre o Firefox; estas regras fazem o mesmo visual no Chrome/Edge */
-.lista::-webkit-scrollbar { width: 8px; }
-.lista::-webkit-scrollbar-track { background: transparent; }
-.lista::-webkit-scrollbar-thumb { background: var(--borda); border-radius: 999px; }
-.lista-linha {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 10px 8px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
-    transition: background-color 120ms ease;
-}
-.lista-linha:last-child { border-bottom: none; }
-@media (hover: hover) and (pointer: fine) {
-    .lista-linha:hover { background: rgba(255, 255, 255, 0.04); }
-}
-.lista-capa {
-    flex: 0 0 42px;
-    width: 42px;
-    height: 56px;
-    object-fit: cover;
-    object-position: center top;
-    border-radius: 6px;
+.tiles::-webkit-scrollbar { width: 8px; }
+.tiles::-webkit-scrollbar-track { background: transparent; }
+.tiles::-webkit-scrollbar-thumb { background: var(--borda); border-radius: 999px; }
+
+.tile {
+    position: relative;
+    aspect-ratio: 3 / 4;
+    border-radius: 10px;
+    overflow: hidden;
     background: var(--superficie-2);
     outline: 1px solid rgba(255, 255, 255, 0.06);
     outline-offset: -1px;
 }
-.lista-info { flex: 1 1 auto; min-width: 0; }
-.lista-nome {
-    font-weight: 600; font-size: 0.92rem; color: var(--texto);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.tile-capa {
+    display: block; width: 100%; height: 100%;
+    object-fit: cover; object-position: center top;
+    transition: transform 260ms var(--ease-out);
 }
-.lista-generos {
-    margin-top: 2px; font-size: 12px; letter-spacing: 0.01em; color: var(--texto-suave);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.tile-vazia { border: 1px dashed var(--borda); }
+
+/* Véu: aparece no hover/foco com blur no que está atrás (backdrop-filter) */
+.tile-veu {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; padding: 12px; text-align: center;
+    background: rgba(11, 13, 20, 0.5);
+    -webkit-backdrop-filter: blur(7px);
+    backdrop-filter: blur(7px);
+    opacity: 0;
+    transition: opacity 200ms var(--ease-out);
 }
-.lista-status { flex: 0 0 auto; width: 96px; display: flex; justify-content: flex-start; }
-.lista-horas {
-    flex: 0 0 auto; width: 72px; text-align: right;
-    font-variant-numeric: tabular-nums;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 0.85rem; font-weight: 600; color: var(--texto);
+.tile-horas {
+    font-size: 1.25rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.1;
+    color: var(--texto); font-variant-numeric: tabular-nums;
 }
+.tile-nome {
+    font-size: 0.75rem; line-height: 1.3; color: var(--texto-suave);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.tile:focus-visible { outline: 2px solid rgba(var(--destaque-rgb), 0.75); outline-offset: 2px; }
+.tile:focus-visible .tile-veu { opacity: 1; }
+@media (hover: hover) and (pointer: fine) {
+    .tile:hover .tile-veu { opacity: 1; }
+    .tile:hover .tile-capa { transform: scale(1.06); }
+}
+/* Sem mouse (celular): sem hover, então o véu fica sempre visível, leve, só na base */
+@media (hover: none) {
+    .tile-veu {
+        opacity: 1; inset: auto 0 0 0; padding: 8px; gap: 4px;
+        -webkit-backdrop-filter: none; backdrop-filter: none;
+        background: linear-gradient(to top, rgba(11, 13, 20, 0.92), transparent);
+    }
+    .tile-nome { display: none; }
+    .tile-horas { font-size: 0.9rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .tile-capa { transition: none; }
+    .tile:hover .tile-capa { transform: none; }
+}
+
 .lista-contador { text-align: right; color: var(--texto-suave); font-size: 0.8rem; padding-top: 0.2rem; }
+
+/* Filtros em pílulas (st.segmented_control) */
+[data-testid="stMain"] [data-testid="stButtonGroup"] { gap: 6px; flex-wrap: wrap; }
+[data-testid="stMain"] [data-testid="stButtonGroup"] button {
+    border-radius: 999px;
+    border: 1px solid var(--borda-suave);
+    background: transparent;
+    color: var(--texto-suave);
+    font-size: 0.8rem;
+    font-weight: 500;
+    min-height: 2rem;
+    padding: 0.2rem 0.9rem;
+    transition: transform var(--t-press) var(--ease-out),
+                background-color var(--t-hover) ease,
+                border-color var(--t-hover) ease,
+                color var(--t-hover) ease;
+}
+[data-testid="stMain"] [data-testid="stButtonGroup"] button:active { transform: scale(0.97); }
+[data-testid="stMain"] [data-testid="stButtonGroup"] button[data-testid*="Active"] {
+    background: rgba(var(--destaque-rgb), 0.18);
+    border-color: rgba(var(--destaque-rgb), 0.6);
+    color: #ffffff;
+}
+@media (hover: hover) and (pointer: fine) {
+    [data-testid="stMain"] [data-testid="stButtonGroup"] button:hover {
+        border-color: rgba(var(--destaque-rgb), 0.5);
+        color: var(--texto);
+    }
+}
 
 /* ---------- Botões do conteúdo ---------- */
 .stButton button, [data-testid="stPopover"] button {
@@ -479,9 +526,14 @@ iframe[title="st_keyup.st_keyup"] { border-radius: 10px; color-scheme: dark; }
 }
 .kpi-valor {
     font-size: clamp(1.9rem, 1.5rem + 1vw, 2.3rem);
-    font-weight: 600; letter-spacing: -0.02em; line-height: 1.1;
+    font-weight: 600; letter-spacing: -0.02em; line-height: 1.25;
     font-variant-numeric: tabular-nums;
-    color: var(--texto); margin-top: 0.3rem;
+    color: var(--texto); margin-top: 0.5rem;
+    padding-bottom: 1.25rem;   /* respiro até a borda de baixo */
+}
+/* Respiro interno dos cards de KPI (só os que contêm .kpi-rotulo) */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.kpi-rotulo) {
+    padding: 0.9rem 1.1rem 0.5rem;
 }
 
 /* ---------- Estado vazio ---------- */

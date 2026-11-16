@@ -1,6 +1,5 @@
-<span id="top"></span>
 <h1 align="center">
-  <br><br> Biblioteca de Jogos
+  Biblioteca de Jogos
 </h1>
 
 <p align="center">
